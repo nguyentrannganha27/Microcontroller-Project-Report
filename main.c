@@ -42,32 +42,32 @@ uint16_t base_adc_smoke = 0;
 int display_temp = 0;
 int smoke_percent = 0;
 
-// ========== LOGIC AN TOÀN CHU?N XÁC 100% ==========
+// ========== LOGIC AN TOAN CHUAN XAC 100% ==========
 void evaluate_safety() {
 	uint8_t local_temp_danger = (display_temp >= temp_threshold);
 	uint8_t local_gas_danger = (smoke_percent >= smoke_threshold);
 	uint8_t local_danger = local_temp_danger || local_gas_danger;
 
-	// X? lý Còi và ?èn
+	// Xu ly Coi va Den
 	if (local_danger || python_danger) {
 		is_alarming = 1;
 		PORTA &= ~(1 << LED_DEN);
-		PORTB &= ~(1 << BUZZER); // B?t còi
+		PORTB &= ~(1 << BUZZER); // Bat coi
 		} else {
 		is_alarming = 0;
 		PORTA |= (1 << LED_DEN);
 		PORTA &= ~(1 << LED_CANH_BAO);
-		PORTB |= (1 << BUZZER);  // T?t còi
+		PORTB |= (1 << BUZZER);  // Tat coi
 	}
 
-	// X? lý Qu?t Auto chu?n yêu c?u
+	// Xu ly Quat Auto chuan yeu cau
 	if (fan_auto_mode) {
 		if (local_gas_danger) {
-			PORTA &= ~(1 << LED_QUAT); // Có khói: C??ng ch? T?T
+			PORTA &= ~(1 << LED_QUAT); // Co khoi: Cuong che TAT
 			} else if (local_temp_danger) {
-			PORTA |= (1 << LED_QUAT);  // Cháy nóng: T? ??ng B?T
+			PORTA |= (1 << LED_QUAT);  // Chay nong: Tu dong BAT
 			} else {
-			PORTA &= ~(1 << LED_QUAT); // Bình th??ng: T? ??ng T?T
+			PORTA &= ~(1 << LED_QUAT); // Binh thuong: Tu dong TAT
 		}
 	}
 }
@@ -225,11 +225,11 @@ int main(void) {
 				_delay_us(100);
 			}
 			
-			// --- NHI?T ?? (Không tr? hao ?o n?a) ---
+			// --- NHIET DO (Khong tru hao do nua) ---
 			float temperature = (float)(sum_temp / 100) * 500.0 / 1024.0;
 			display_temp = (int)(temperature + 0.5);
 
-			// --- KHÍ GAS (Không tr? hao ?o n?a) ---
+			// --- KHi GAS (Khong tru hao do nua) ---
 			long adc_diff = (sum_smoke / 100) - base_adc_smoke;
 			if (adc_diff < 0) adc_diff = 0;
 			
