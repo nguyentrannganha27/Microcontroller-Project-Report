@@ -65,7 +65,7 @@ void evaluate_safety() {
 		if (local_gas_danger) {
 			PORTA &= ~(1 << LED_QUAT); // Co khoi: Cuong che TAT
 			} else if (local_temp_danger) {
-			PORTA |= (1 << LED_QUAT);  // Chay nong: Tu dong BAT
+			PORTA |= (1 << LED_QUAT);   // Chay nong: Tu dong BAT
 			} else {
 			PORTA &= ~(1 << LED_QUAT); // Binh thuong: Tu dong TAT
 		}
