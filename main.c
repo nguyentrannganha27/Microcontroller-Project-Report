@@ -10,12 +10,12 @@
 
 // ========== DINH NGHIA CHAN ==========
 #define BUZZER          PB7
-#define LED_DEN         PA1     // Den bao an toan
-#define LED_QUAT        PA2     // Chan kich Transistor quat
+#define LED_DEN         PA1     // Den bao an toan (Xanh)
+#define LED_QUAT        PA2
 #define LED_CANH_BAO    PA0     // Den do nhap nhay
 
-#define LM35_ADC        0       // Chan PF0
-#define MQ2_ADC         1       // Chan PF1
+#define LM35_ADC        0
+#define MQ2_ADC         1
 
 // ========== EEPROM: MAC DINH 50 VA 40 ==========
 uint8_t EEMEM ee_temp_threshold = 50;
@@ -32,42 +32,38 @@ volatile char uart_buffer[20];
 volatile uint8_t uart_index = 0;
 volatile uint8_t uart_ready = 0;
 
-// Co trang thai he thong
 volatile uint8_t is_alarming = 0;
-volatile uint8_t fan_auto_mode = 1; // Mac dinh la Auto
+volatile uint8_t fan_auto_mode = 1;
 volatile uint8_t python_danger = 0;
 
-// Bien luu du lieu do luong
 uint16_t base_adc_smoke = 0;
 int display_temp = 0;
 int smoke_percent = 0;
 
-// ========== LOGIC AN TOAN CHUAN XAC 100% ==========
+// ========== LOGIC AN TOAN ==========
 void evaluate_safety() {
 	uint8_t local_temp_danger = (display_temp >= temp_threshold);
 	uint8_t local_gas_danger = (smoke_percent >= smoke_threshold);
 	uint8_t local_danger = local_temp_danger || local_gas_danger;
 
-	// Xu ly Coi va Den
 	if (local_danger || python_danger) {
 		is_alarming = 1;
 		PORTA &= ~(1 << LED_DEN);
-		PORTB &= ~(1 << BUZZER); // Bat coi
+		PORTB &= ~(1 << BUZZER);
 		} else {
 		is_alarming = 0;
 		PORTA |= (1 << LED_DEN);
 		PORTA &= ~(1 << LED_CANH_BAO);
-		PORTB |= (1 << BUZZER);  // Tat coi
+		PORTB |= (1 << BUZZER);
 	}
 
-	// Xu ly Quat Auto chuan yeu cau
 	if (fan_auto_mode) {
 		if (local_gas_danger) {
-			PORTA &= ~(1 << LED_QUAT); // Co khoi: Cuong che TAT
+			PORTA &= ~(1 << LED_QUAT);
 			} else if (local_temp_danger) {
-			PORTA |= (1 << LED_QUAT);   // Chay nong: Tu dong BAT
+			PORTA |= (1 << LED_QUAT);
 			} else {
-			PORTA &= ~(1 << LED_QUAT); // Binh thuong: Tu dong TAT
+			PORTA &= ~(1 << LED_QUAT);
 		}
 	}
 }
@@ -148,6 +144,7 @@ int main(void) {
 	char buffer[50];
 	DDRB |= (1 << BUZZER);
 	DDRA |= (1 << LED_DEN) | (1 << LED_QUAT) | (1 << LED_CANH_BAO);
+
 	PORTA |= (1 << LED_DEN);
 	PORTA &= ~((1 << LED_QUAT) | (1 << LED_CANH_BAO));
 	PORTB |= (1 << BUZZER);
@@ -164,8 +161,10 @@ int main(void) {
 	sei();
 
 	uart_puts("He thong da san sang!\r\n");
+	
 	uint32_t sum_base_smoke = 0;
 	for (int i = 0; i < 20; i++) {
+		adc_read(LM35_ADC);
 		adc_read(LM35_ADC);
 		adc_read(MQ2_ADC);
 		sum_base_smoke += adc_read(MQ2_ADC);
@@ -194,21 +193,27 @@ int main(void) {
 				switch(uart_buffer[0]) {
 					case 'O':
 					case 'o':
-					fan_auto_mode = 1;
-					uart_puts(">> QUAT: AUTO\r\n");
-					beep_confirm(); evaluate_safety();
+					if (fan_auto_mode != 1) {
+						fan_auto_mode = 1;
+						uart_puts(">> QUAT: AUTO\r\n");
+						beep_confirm(); evaluate_safety();
+					}
 					break;
 					case 'F':
-					fan_auto_mode = 0;
-					PORTA |= (1 << LED_QUAT);
-					uart_puts(">> QUAT: ON\r\n");
-					beep_confirm();
+					if (fan_auto_mode != 0 || !(PORTA & (1 << LED_QUAT))) {
+						fan_auto_mode = 0;
+						PORTA |= (1 << LED_QUAT);
+						uart_puts(">> QUAT: ON\r\n");
+						beep_confirm();
+					}
 					break;
 					case 'f':
-					fan_auto_mode = 0;
-					PORTA &= ~(1 << LED_QUAT);
-					uart_puts(">> QUAT: OFF\r\n");
-					beep_confirm();
+					if (fan_auto_mode != 0 || (PORTA & (1 << LED_QUAT))) {
+						fan_auto_mode = 0;
+						PORTA &= ~(1 << LED_QUAT);
+						uart_puts(">> QUAT: OFF\r\n");
+						beep_confirm();
+					}
 					break;
 					case 'A': python_danger = 1; evaluate_safety(); break;
 					case 'a': python_danger = 0; evaluate_safety(); break;
@@ -220,19 +225,25 @@ int main(void) {
 			flag_2s = 0;
 			uint32_t sum_temp = 0, sum_smoke = 0;
 			for (int i = 0; i < 100; i++) {
+				adc_read(LM35_ADC);
 				sum_temp += adc_read(LM35_ADC);
+				adc_read(MQ2_ADC);
 				sum_smoke += adc_read(MQ2_ADC);
 				_delay_us(100);
 			}
 			
-			// --- NHIET DO (Khong tru hao do nua) ---
-			float temperature = (float)(sum_temp / 100) * 500.0 / 1024.0;
+			float temperature = ((float)sum_temp / 100.0) * 500.0 / 1024.0;
 			display_temp = (int)(temperature + 0.5);
 
-			// --- KHi GAS (Khong tru hao do nua) ---
+			// HI?U CHU?N OFFSET B?NG PH?N M?M
+			// Tr? ?i 5°C nhi?u khi ph?n c?ng kích qu?t kéo dòng
+			if (PORTA & (1 << LED_QUAT)) {
+				display_temp -= 5;
+				if (display_temp < 0) display_temp = 0;
+			}
+
 			long adc_diff = (sum_smoke / 100) - base_adc_smoke;
 			if (adc_diff < 0) adc_diff = 0;
-			
 			smoke_percent = (adc_diff * 100L) / 1024L;
 			
 			if (smoke_percent <= 2) smoke_percent = 0;
@@ -241,7 +252,7 @@ int main(void) {
 			evaluate_safety();
 			
 			sprintf(buffer, "Nhiet do hien tai: %d.0 C\r\n", display_temp); uart_puts(buffer);
-			sprintf(buffer, "Khoi & Gas: %d %%\r\n", smoke_percent); uart_puts(buffer);
+			sprintf(buffer, "KHOI: %d %%\r\n", smoke_percent); uart_puts(buffer);
 		}
 	}
 }
